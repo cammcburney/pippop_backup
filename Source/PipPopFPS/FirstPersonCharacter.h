@@ -7,6 +7,7 @@
 #include "Logging/LogMacros.h"
 #include "Particles/ParticleSystem.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Animation/AnimSequence.h"
 #include "FirstPersonCharacter.generated.h"
 
 class ABaseGun;
@@ -14,6 +15,7 @@ class USpringArmComponent;
 class UCameraComponent;
 class UInputMappingContext;
 class UInputAction;
+class UAnimSequence;
 struct FInputActionValue;
 
 UCLASS()
@@ -57,6 +59,14 @@ public:
 
 	AFirstPersonCharacter();
 
+	UPROPERTY(EditAnywhere, Category = Animation, meta = (AllowPrivateAccess = "true"))
+	UAnimSequence* IdleAnimation;
+
+	UPROPERTY(EditAnywhere, Category = Animation, meta = (AllowPrivateAccess = "true"))
+	UAnimSequence* RunAnimation;
+
+	void SetAnimation(UAnimSequence* Animation, bool Looping);
+	
 protected:
 
 	virtual void BeginPlay() override;
@@ -69,18 +79,30 @@ protected:
 	
 	void Fire(const FInputActionValue& Value);
 
+	UFUNCTION(Server, Reliable)
+	void ServerFireGun();
+
 	void Reload(const FInputActionValue& Value);
 
+	UFUNCTION(Server, Reliable)
+	void ServerReloadGun();
+
+	UFUNCTION(Server, Unreliable)
+	void WallSliding();
+
 	void WallJump(const FInputActionValue& Value);
+
+	UFUNCTION(Server, Unreliable)
+	void WallJumpRequest();
 	
 	void PickupItem(const FInputActionValue& Value);
+
+	UFUNCTION(Server, Reliable)
+	void ServerPickupItem();
 
 	void EnableReload();
 
 	void StopAiming();
-
-	void WallSliding();
-
 
 public:	
 
@@ -115,16 +137,23 @@ public:
 
 	// Movement
 
+	UFUNCTION(Server, Reliable)
+	void EnableWallJump();
+
 	bool IsWallSliding;
 	bool WallJumpSlideEnabled;
 	bool CanWallJump;
-	void EnableWallJump();
 	FTimerHandle WallJumpCooldownHandle; 
+
 	UPROPERTY(EditAnywhere)
     float WallJumpCooldownTime = 1.0f; 
 
 private:
-	UPROPERTY(EditDefaultsOnly)
+
+	UPROPERTY(VisibleAnywhere, Category=Camera)
+	UCameraComponent* CineCamera;
+
+	UPROPERTY(EditAnywhere)
 	TSubclassOf<ABaseGun> GunClass;
 
 	UPROPERTY(Replicated)
@@ -132,9 +161,6 @@ private:
 
 	UPROPERTY(VisibleAnywhere, Category=Camera)
 	class USpringArmComponent* CameraBoom;
-
-	UPROPERTY(VisibleAnywhere, Category=Camera)
-	class UCameraComponent* FirstPersonCamera;
 
 	FTimerHandle ReloadCooldownTimerHandle;
 

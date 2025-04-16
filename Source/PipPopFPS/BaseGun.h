@@ -45,21 +45,25 @@ public:
 
 	ABaseGun();
 	
+	UFUNCTION(Server, Reliable)
 	void FireGun();
 	
 	bool CanFire();
 
 	UFUNCTION(Server, Reliable)
-	void ServerBulletLineTrace(AController* OwnerController, FVector Location, FRotator Rotation);
+	virtual void ServerBulletLineTrace(AController* OwnerController, FVector Location, FRotator Rotation);
 
 	UFUNCTION(Server, Reliable)
 	void DamageActors(AController* OwnerController, FHitResult Hit, FBulletTrajectory Bullet);
 	
 	FBulletTrajectory CalculateBulletTrajectory(FVector Location, FRotator Rotation);
 
+	UFUNCTION(Server, Reliable)
 	void Reload();
 
+	UFUNCTION(Server, Reliable)
 	void ReloadStatus(bool CanReload);
+	
 	bool ReloadAvailable = true;
 
 	UFUNCTION(NetMulticast, Unreliable)
@@ -76,6 +80,9 @@ protected:
 public:	
 	
 	virtual void Tick(float DeltaTime) override;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Gun", meta = (AllowPrivateAccess = "true"))
+	USkeletalMeshComponent* Mesh;
 	
 private:
 	
@@ -83,9 +90,6 @@ private:
 
 	UPROPERTY(VisibleAnywhere)
 	USceneComponent* Root;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Gun", meta = (AllowPrivateAccess = "true"))
-	USkeletalMeshComponent* Mesh;
 
 	UPROPERTY(EditAnywhere, Category = "Effects")
 	UNiagaraSystem* MuzzleFlashNiagaraSystem;

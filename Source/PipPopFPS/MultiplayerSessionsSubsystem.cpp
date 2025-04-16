@@ -123,7 +123,7 @@ void UMultiplayerSessionsSubsystem::OnCreateSessionComplete(FName SessionName, b
 
     if (WasSuccessful)
     {
-        GetWorld()->ServerTravel("/Game/TestLevel?listen");
+        GetWorld()->ServerTravel("/Game/MENU_CharacterSelect?listen");
     }
 }
 

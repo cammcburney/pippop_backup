@@ -36,71 +36,58 @@ bool ABaseGun::CanFire()
 	return (GetWorld()->GetTimeSeconds() - LastFireTime >= FireRate);
 }
 
-void ABaseGun::FireGun()
+void ABaseGun::FireGun_Implementation()
 {   
 
         if (!Ammo || !Magazines || !CanFire()) return;
         SpawnMuzzleFlash();
         AController* OwnerController = GetOwnerController();
         if (OwnerController == nullptr) return;
-
-        ENetRole LocalRole = GetLocalRole();
-        ENetRole RemoteRole = GetRemoteRole();
-        GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Yellow, 
-            FString::Printf(TEXT("Local Role: %s, Remote Role: %s"), 
-            *UEnum::GetValueAsString(TEXT("Engine.ENetRole"), LocalRole),
-            *UEnum::GetValueAsString(TEXT("Engine.ENetRole"), RemoteRole)));
-        
-        // Debug if we're attempting to call the Server RPC
-        GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Red, TEXT("Attempting ServerBulletLineTrace"));
-    
-
         FVector Location;
         FRotator Rotation;
         OwnerController->GetPlayerViewPoint(Location, Rotation);
-        GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Cyan, TEXT("Fired"));
-        ServerBulletLineTrace(OwnerController,Location, Rotation);
+        ServerBulletLineTrace(OwnerController, Location, Rotation);
         LastFireTime = GetWorld()->GetTimeSeconds();
         Ammo--;
-        // UE_LOG(LogTemp, Warning, TEXT("Ammo: %s"), *FString::Printf(TEXT("%d"), Ammo));
+        UE_LOG(LogTemp, Warning, TEXT("Ammo: %s"), *FString::Printf(TEXT("%d"), Ammo));
 }
 
 void ABaseGun::ServerBulletLineTrace_Implementation(AController* OwnerController, FVector Location, FRotator Rotation)
 {
     FHitResult Hit;
-    GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Red, TEXT("Attempting ServerBulletLineTrace"));
-    if (HasAuthority())
-    {
-        GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Cyan, TEXT("Server Line Trace"));
-        for (int32 i = 0; i < BulletsFiredPerShot; i++)
+    for (int32 i = 0; i < BulletsFiredPerShot; i++)
+        {
+            FBulletTrajectory Bullet = CalculateBulletTrajectory(Location, Rotation);
+            if (GetWorld()->LineTraceSingleByChannel(Hit, Location, Bullet.End, ECollisionChannel::ECC_GameTraceChannel1))
             {
-                FBulletTrajectory Bullet = CalculateBulletTrajectory(Location, Rotation);
-                if (GetWorld()->LineTraceSingleByChannel(Hit, Location, Bullet.End, ECollisionChannel::ECC_GameTraceChannel1))
-                {
-                    SpawnBulletImpact(Hit, Bullet);
-                    DamageActors(OwnerController, Hit, Bullet);
-                }
+                SpawnBulletImpact(Hit, Bullet);
+                DamageActors(OwnerController, Hit, Bullet);
             }
-    }
-    else
-    {
-        GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Red, TEXT("NO AUTHORITY"));
-    }
+        }
+
 }
 
 void ABaseGun::DamageActors_Implementation(AController* OwnerController, FHitResult Hit, FBulletTrajectory Bullet)
 {   
     if (HasAuthority())
     {
-        GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Cyan, TEXT("Server Try Damage Actor"));
         AActor* DamagedActor = Hit.GetActor();
         if (DamagedActor && HasAuthority())
         {   
+            float DamageReduction = MaxRange - Hit.Distance;
+            if (DamageReduction < 0)
+            {
+                Damage = Damage - DamageReduction;
+            }
             FPointDamageEvent DamageEvent(Damage, Hit, Bullet.ShotDirection, nullptr);
             AFirstPersonCharacter* Character = Cast<AFirstPersonCharacter>(DamagedActor);
+            UE_LOG(LogTemp, Warning, TEXT("Damage Calculation Debug"));
+            UE_LOG(LogTemp, Warning, TEXT("Hit Actor: %s"), *DamagedActor->GetName());
+            UE_LOG(LogTemp, Warning, TEXT("Base Damage: %.2f"), Damage);
+            UE_LOG(LogTemp, Warning, TEXT("Max Range: %.2f"), MaxRange);
+            UE_LOG(LogTemp, Warning, TEXT("Hit Distance: %.2f"), Hit.Distance);
             if (Character)
             {   
-                GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Cyan, TEXT("Call Damage Character"));
                 Character->TakeDamage(Damage, DamageEvent, OwnerController, this);
             }
         }
@@ -127,9 +114,9 @@ AController* ABaseGun::GetOwnerController()
     return OwnerPawn ? OwnerPawn->GetController() : nullptr;
 }
 
-void ABaseGun::Reload()
+void ABaseGun::Reload_Implementation()
 {
-    if (Magazines)
+    if (Magazines && ReloadAvailable)
     {
         Ammo = MaxAmmo;
         Magazines--;
@@ -137,26 +124,27 @@ void ABaseGun::Reload()
     }
 }
 
-void ABaseGun::ReloadStatus(bool CanReload)
+void ABaseGun::ReloadStatus_Implementation(bool CanReload)
 {
     ReloadAvailable = CanReload;
+    FString DebugMessage = FString::Printf(TEXT("CanReload: %s"), ReloadAvailable ? TEXT("True") : TEXT("False"));
+    GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, DebugMessage);
+
 }
 
 void ABaseGun::SpawnMuzzleFlash_Implementation()
 {
-    // Make sure the Niagara system is set up properly in the class.
     if (MuzzleFlashNiagaraSystem)
     {
-        // Spawn the Niagara effect at the muzzle location
         UNiagaraFunctionLibrary::SpawnSystemAttached(
             MuzzleFlashNiagaraSystem, 
             Mesh, 
-            TEXT("MuzzleFlash"), // Socket name to attach to
+            TEXT("MuzzleFlash"),
             FVector::ZeroVector, 
             FRotator::ZeroRotator, 
             EAttachLocation::SnapToTarget, 
-            true, // Auto destroy when finished
-            true  // Auto activate
+            true, 
+            true  
         );
     }
 }
@@ -164,18 +152,16 @@ void ABaseGun::SpawnMuzzleFlash_Implementation()
 
 void ABaseGun::SpawnBulletImpact_Implementation(FHitResult Hit, FBulletTrajectory Bullet)
 {
-    // Make sure the Niagara system for bullet impact is set up properly.
     if (BulletImpactNiagaraSystem)
     {
-        // Spawn the Niagara effect at the bullet impact location
         UNiagaraFunctionLibrary::SpawnSystemAtLocation(
             GetWorld(),
             BulletImpactNiagaraSystem, 
             Hit.Location, 
-            Bullet.ShotDirection.Rotation(),
-            FVector(1.0f, 1.0f, 1.0f), // Set scale (this is optional and can be adjusted)
-            true,  // Auto activate
-            true   // Auto destroy when finished
+            Bullet.End.Rotation(),
+            FVector(1.0f, 1.0f, 1.0f),
+            true,
+            true 
         );
     }
 }

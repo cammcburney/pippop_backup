@@ -24,10 +24,12 @@ AFirstPersonCharacter::AFirstPersonCharacter()
 	CameraBoom->SetupAttachment(GetMesh());
 	CameraBoom->TargetArmLength = 600.0f;
 	CameraBoom->bUsePawnControlRotation = true;
+	
+	CineCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("CineCamera"));
+    CineCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
+    CineCamera->bUsePawnControlRotation = false; 
+    CineCamera->FieldOfView = 110.0f;
 
-	FirstPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
-	FirstPersonCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
-	FirstPersonCamera->bUsePawnControlRotation = false;
 }
 
 void AFirstPersonCharacter::BeginPlay()
@@ -38,12 +40,17 @@ void AFirstPersonCharacter::BeginPlay()
 
 	Health = MaxHealth;
 
-	Gun = GetWorld()->SpawnActor<ABaseGun>(GunClass);
-	if (Gun)
-	{	
-		Gun->AttachToComponent(GetMesh(), FAttachmentTransformRules::KeepRelativeTransform, TEXT("WeaponSocket"));
-		Gun->SetOwner(this);
-	}
+	if (HasAuthority() && !Gun)
+    {
+        Gun = GetWorld()->SpawnActor<ABaseGun>(GunClass);
+        if (Gun)
+        {   
+            Gun->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, TEXT("WeaponSocket"));
+            Gun->SetOwner(this);
+        }
+    }
+
+	SetAnimation(IdleAnimation, true);
 }
 
 void AFirstPersonCharacter::Tick(float DeltaTime)
@@ -60,6 +67,11 @@ void AFirstPersonCharacter::Tick(float DeltaTime)
 	{
 		WallSliding();
 	}
+}
+
+void AFirstPersonCharacter::SetAnimation(UAnimSequence* Animation, bool Looping)
+{
+	GetMesh()->PlayAnimation(Animation, Looping);
 }
 
 void AFirstPersonCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -107,7 +119,7 @@ void AFirstPersonCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInp
 void AFirstPersonCharacter::Move(const FInputActionValue& Value)
 {
 	FVector2D MovementVector = Value.Get<FVector2D>();
-	
+
 	if (Controller != nullptr)
 	{	
 		const FRotator Rotation = Controller->GetControlRotation();
@@ -118,6 +130,7 @@ void AFirstPersonCharacter::Move(const FInputActionValue& Value)
 
 		AddMovementInput(ForwardDirection, MovementVector.Y);
 		AddMovementInput(RightDirection, MovementVector.X);
+		SetAnimation(RunAnimation, true);
 	}
 }
 
@@ -132,10 +145,9 @@ void AFirstPersonCharacter::Look(const FInputActionValue& Value)
 	}
 }
 
-void AFirstPersonCharacter::WallSliding()
+void AFirstPersonCharacter::WallSliding_Implementation()
 {
     UCharacterMovementComponent* MoveComponent = GetCharacterMovement();
-
     if (MoveComponent->IsFalling())
     {
         FVector Start = GetActorLocation();
@@ -170,7 +182,7 @@ void AFirstPersonCharacter::WallSliding()
 }
 
 
-void AFirstPersonCharacter::EnableWallJump()
+void AFirstPersonCharacter::EnableWallJump_Implementation()
 {
 	WallJumpSlideEnabled = true;
 }
@@ -180,7 +192,15 @@ void AFirstPersonCharacter::WallJump(const FInputActionValue& Value)
     UCharacterMovementComponent* MoveComponent = GetCharacterMovement();
     bool ShouldWallJump = Value.Get<bool>();
     
-    if (ShouldWallJump && CanWallJump && IsWallSliding && WallJumpSlideEnabled)
+    if (ShouldWallJump)
+	{
+		WallJumpRequest();
+	}
+}
+
+void AFirstPersonCharacter::WallJumpRequest_Implementation()
+{
+	if (CanWallJump && IsWallSliding && WallJumpSlideEnabled)
     {
         FVector JumpDirection = GetActorForwardVector() * 1500 + FVector(0.0f, 0.0f, 400.0f);
         LaunchCharacter(JumpDirection, true, true);
@@ -223,12 +243,18 @@ void AFirstPersonCharacter::Fire(const FInputActionValue& Value)
 
 	if (Firing)
 	{	
-		if (Gun)
-		{
-			Gun->FireGun();
-		}
+		ServerFireGun();
 	}
 }
+
+void AFirstPersonCharacter::ServerFireGun_Implementation()
+{
+    if (Gun)
+    {
+        Gun->FireGun(); 
+    }
+}
+
 
 void AFirstPersonCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
@@ -239,43 +265,38 @@ void AFirstPersonCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 float AFirstPersonCharacter::TakeDamage(float Damage, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
     const float ActualDamage = Super::TakeDamage(Damage, DamageEvent, EventInstigator, DamageCauser);
-	GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Red, TEXT("Call Damage Actors"));
 	ServerUpdateHealth(Damage);
 	return Damage;
 }
 
 void AFirstPersonCharacter::ServerUpdateHealth_Implementation(float Damage)
 {
-	if (HasAuthority())
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Green, TEXT("Server call update hp"));
-		Health = Health - Damage;
-		OnRep_UpdateHealth();
-	}
+	Health = Health - Damage;
+	OnRep_UpdateHealth();
 }
 
 void AFirstPersonCharacter::OnRep_UpdateHealth()
-{
-	FString HealthMessage = FString::Printf(TEXT("Update REP health: %f"), Health);
-	GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Red, *HealthMessage);
-}
+{}
 
 void AFirstPersonCharacter::Reload(const FInputActionValue& Value)
 {
     bool Reloading = Value.Get<bool>();
+	if (Reloading)
+	{
+		ServerReloadGun();
+	}
+}
 
-    if (Reloading && Gun->ReloadAvailable)
-    {
-        Gun->Reload();
-        Gun->ReloadStatus(false);
-        GetWorld()->GetTimerManager().SetTimer(
-			ReloadCooldownTimerHandle, 
-			[this]() { Gun->ReloadStatus(true); },
-			3.0f, 
-			false
-		);
-		
-    }
+void AFirstPersonCharacter::ServerReloadGun_Implementation()
+{
+	Gun->Reload();
+	Gun->ReloadStatus(false);
+	GetWorld()->GetTimerManager().SetTimer(
+		ReloadCooldownTimerHandle, 
+		[this]() { Gun->ReloadStatus(true); },
+		3.0f, 
+		false
+	);
 }
 
 void AFirstPersonCharacter::PickupItem(const FInputActionValue& Value)
@@ -284,22 +305,27 @@ void AFirstPersonCharacter::PickupItem(const FInputActionValue& Value)
 
 	if (TryPickup)
 	{
-		FVector Start = GetActorLocation();
-		FVector End = Start + GetActorForwardVector() * 500;
-		FHitResult ItemHit;
-		bool FoundItem = GetWorld()->LineTraceSingleByChannel(ItemHit, Start, End, ECollisionChannel::ECC_Visibility);
+		ServerPickupItem();
+	}
+}
 
-		if (FoundItem)
-		{	
-			AActor* ItemActor = ItemHit.GetActor();
-			if (ItemActor)
+void AFirstPersonCharacter::ServerPickupItem_Implementation()
+{
+	FVector Start = GetActorLocation();
+	FVector End = Start + GetActorForwardVector() * 500;
+	FHitResult ItemHit;
+	bool FoundItem = GetWorld()->LineTraceSingleByChannel(ItemHit, Start, End, ECollisionChannel::ECC_Visibility);
+
+	if (FoundItem)
+	{	
+		AActor* ItemActor = ItemHit.GetActor();
+		if (ItemActor)
+		{
+			if (ItemActor->ActorHasTag("Gun"))
 			{
-				if (ItemActor->ActorHasTag("Gun"))
-				{
-					Gun = Cast<ABaseGun>(ItemActor);
-					Gun->AttachToComponent(GetMesh(), FAttachmentTransformRules::KeepRelativeTransform, TEXT("WeaponSocket"));
-					Gun->SetOwner(this);
-				}
+				Gun = Cast<ABaseGun>(ItemActor);
+				Gun->AttachToComponent(GetMesh(), FAttachmentTransformRules::KeepRelativeTransform, TEXT("WeaponSocket"));
+				Gun->SetOwner(this);
 			}
 		}
 	}
