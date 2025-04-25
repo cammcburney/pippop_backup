@@ -4,16 +4,16 @@
 #include "TestActor.h"
 #include "Net/UnrealNetwork.h"
 #include "Kismet/GameplayStatics.h"
-// Sets default values
+
 ATestActor::ATestActor()
 {
- 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
+
 	PrimaryActorTick.bCanEverTick = true;
 	ReplicatedVar = 100.0f;
 	bReplicates = true;
 }
 
-// Called when the game starts or when spawned
+
 void ATestActor::BeginPlay()
 {
 	Super::BeginPlay();
@@ -35,15 +35,6 @@ void ATestActor::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-
-	// if (HasAuthority())
-	// {
-	// 	GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Red, TEXT("Server"));
-	// }
-	// else
-	// {
-	// 	GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Red, TEXT("Client"));
-	// }
 }
 
 void ATestActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -58,12 +49,8 @@ void ATestActor::OnRep_ReplicatedVar()
 	{	
 		FVector NewLocation = GetActorLocation() + FVector(0.0f, 0.0f, 200.0f);
 		SetActorLocation(NewLocation);
-		// GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Red, TEXT("Server"));
 	}
-	// else
-	// {
-	// 	// GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Yellow, FString::Printf(TEXT("Client %d: OnRep_ReplicatedVar"), static_cast<int>(GPlayInEditorID)));
-	// }
+
 }
 
 void ATestActor::DecreaseReplicatedVar()
@@ -83,12 +70,7 @@ void ATestActor::NetMulticastRPCFunction_Implementation()
 {
 	if (HasAuthority())
 	{
-		// GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Yellow, FString::Printf(TEXT("Server")));
 		GetWorld()->GetTimerManager().SetTimer(TestTimer, this, &ATestActor::NetMulticastRPCFunction, 2.0f, false);
-	}
-	else
-	{
-		// GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Yellow, FString::Printf(TEXT("Client")));
 	}
 
 	if (!IsRunningDedicatedServer())

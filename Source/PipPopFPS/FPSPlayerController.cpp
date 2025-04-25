@@ -5,33 +5,23 @@
 #include "GameFramework/Actor.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
+#include "Engine/Engine.h"
+#include "PipPopGameMode.h"
 
-// Server-side possess function
-void AFPSPlayerController::ServerPossessCharacter_Implementation(APawn* NewPawn)
+void AFPSPlayerController::BeginPlay()
 {
-    // Ensure we have a valid pawn to possess
-    if (NewPawn)
+    Super::BeginPlay();
+    if (GetWorld()->GetFirstLocalPlayerFromController())
     {
-        Possess(NewPawn);  // Possess the new character
+        ServerSpawnPlayer();
     }
 }
 
-// Validate the server-side possess call (important for security in multiplayer)
-bool AFPSPlayerController::ServerPossessCharacter_Validate(APawn* NewPawn)
+void AFPSPlayerController::ServerSpawnPlayer_Implementation()
 {
-    return NewPawn != nullptr;  // You can add more validation logic here
-}
-
-// Client-side function to initiate possession (calling the server RPC)
-void AFPSPlayerController::PossessCharacterOnClient(APawn* NewPawn)
-{
-    if (HasAuthority())
+    APipPopGameMode* GameMode = Cast<APipPopGameMode>(UGameplayStatics::GetGameMode(GetWorld()));
+    if (GameMode)
     {
-        Possess(NewPawn);  // If we have authority (on the server), possess directly
-    }
-    else
-    {
-        // Call the server RPC to possess the new character
-        ServerPossessCharacter(NewPawn);
+        GameMode->SpawnPlayer(this);
     }
 }

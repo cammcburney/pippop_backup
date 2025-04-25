@@ -15,7 +15,7 @@ UMultiplayerSessionsSubsystem::UMultiplayerSessionsSubsystem()
     CreateServerAfterDestroy = false;
     DestroyServerName = "";
     ServerNameSearched = "";
-    MySessionName = FName("TestServer"); // Default session name
+    MySessionName = FName("TestServer");
 }
 
 void UMultiplayerSessionsSubsystem::Initialize(FSubsystemCollectionBase& Collection)
@@ -46,7 +46,6 @@ void UMultiplayerSessionsSubsystem::CreateServer(FString ServerName)
     {   
         FOnlineSessionSettings SessionSettings;
 
-        // Set MySessionName to the server name passed in
         MySessionName = FName(*ServerName);
 
         FNamedOnlineSession* ExistingSession = SessionInterface->GetNamedSession(MySessionName);
@@ -75,7 +74,6 @@ void UMultiplayerSessionsSubsystem::CreateServer(FString ServerName)
 
         SessionSettings.Set(FName("SERVER_NAME"), ServerName, EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
 
-        // Use MySessionName here
         SessionInterface->CreateSession(0, MySessionName, SessionSettings);
     }
     else
@@ -92,7 +90,6 @@ void UMultiplayerSessionsSubsystem::FindServer(FString ServerName)
     {
         SessionSearch = MakeShareable(new FOnlineSessionSearch());
 
-        // Set MySessionName to the server name passed in
         MySessionName = FName(*ServerName);
 
         bool IsLAN = false;
@@ -106,7 +103,6 @@ void UMultiplayerSessionsSubsystem::FindServer(FString ServerName)
 
         ServerNameSearched = ServerName;
 
-        // Use MySessionName here
         SessionInterface->FindSessions(0, SessionSearch.ToSharedRef());
     }
     else
@@ -207,7 +203,6 @@ void UMultiplayerSessionsSubsystem::OnJoinSessionComplete(FName SessionName, EOn
         }
         else
         {
-            // If the address wasn't stored, print a message
             PrintString(TEXT("Failed to resolve connection address"));
         }
     }

@@ -26,3 +26,8 @@ void APipPopGameMode::JoinLANGame()
         PC->ClientTravel("192.168.0.39/Game/TestLevel?listen", TRAVEL_Absolute);
     }
 }
+
+void APipPopGameMode::SpawnPlayer_Implementation(APlayerController* PC)
+{
+
+}

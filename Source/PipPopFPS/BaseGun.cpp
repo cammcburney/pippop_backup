@@ -55,20 +55,41 @@ void ABaseGun::FireGun_Implementation()
 void ABaseGun::ServerBulletLineTrace_Implementation(AController* OwnerController, FVector Location, FRotator Rotation)
 {
     FHitResult Hit;
-    for (int32 i = 0; i < BulletsFiredPerShot; i++)
-        {
-            FBulletTrajectory Bullet = CalculateBulletTrajectory(Location, Rotation);
-            if (GetWorld()->LineTraceSingleByChannel(Hit, Location, Bullet.End, ECollisionChannel::ECC_GameTraceChannel1))
-            {
-                SpawnBulletImpact(Hit, Bullet);
-                DamageActors(OwnerController, Hit, Bullet);
-            }
-        }
 
+    FCollisionQueryParams QueryParams;
+    QueryParams.AddIgnoredActor(this);
+    if (AActor* OwnerActor = GetOwner())
+    {
+        QueryParams.AddIgnoredActor(OwnerActor);
+    }
+
+    for (int32 i = 0; i < BulletsFiredPerShot; i++)
+    {
+        FBulletTrajectory Bullet = CalculateBulletTrajectory(Location, Rotation);
+
+        if (GetWorld()->LineTraceSingleByChannel(Hit, Location, Bullet.End, ECollisionChannel::ECC_GameTraceChannel1, QueryParams))
+        {
+            DrawDebugLine(
+                GetWorld(),
+                Location,
+                Bullet.End,
+                FColor::Red,
+                false,
+                2.0f,
+                0,
+                1.0f
+            );
+
+            SpawnBulletImpact(Hit, Bullet);
+            DamageActors(OwnerController, Hit, Bullet);
+        }
+    }
 }
+
 
 void ABaseGun::DamageActors_Implementation(AController* OwnerController, FHitResult Hit, FBulletTrajectory Bullet)
 {   
+    
     if (HasAuthority())
     {
         AActor* DamagedActor = Hit.GetActor();
