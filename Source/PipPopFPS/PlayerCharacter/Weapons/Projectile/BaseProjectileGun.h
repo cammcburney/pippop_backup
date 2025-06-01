@@ -3,8 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "BaseGun.h"
-#include "BaseProjectile.h"
+#include "../HitScan/BaseGun.h"
+#include "ProjectileAmmo/BaseProjectile.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "BaseProjectileGun.generated.h"
 

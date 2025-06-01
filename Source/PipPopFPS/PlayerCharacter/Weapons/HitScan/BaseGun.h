@@ -36,7 +36,7 @@ struct FSpreadAngleAxis
 	float RightAngle; 
 };
 
-UCLASS()
+UCLASS(BlueprintType)
 class PIPPOPFPS_API ABaseGun : public AActor
 {
 	GENERATED_BODY()
@@ -83,6 +83,8 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Gun", meta = (AllowPrivateAccess = "true"))
 	USkeletalMeshComponent* Mesh;
+
+	void DestroySelf();
 	
 private:
 	
@@ -125,4 +127,5 @@ private:
 	int32 BulletsFiredPerShot = 1;
 
 	float LastFireTime = 0.0f;
+
 };

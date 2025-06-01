@@ -8,6 +8,9 @@
 #include "Particles/ParticleSystem.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Animation/AnimSequence.h"
+#include "GameFramework/PlayerState.h"
+#include "../State/FPSPlayerState.h"
+#include "../Components/WeaponInventoryComponent.h"
 #include "FirstPersonCharacter.generated.h"
 
 class ABaseGun;
@@ -47,11 +50,17 @@ class PIPPOPFPS_API AFirstPersonCharacter : public ACharacter
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* PickupItemAction;
 
-	UPROPERTY(EditAnywhere, Category = Input, meta = (AllowPrivateAcces = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* ReloadAction;
 
-	UPROPERTY(EditAnywhere, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* WallJumpAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* SpecialAbilityOne;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* SwitchWeaponAction;
 
 
 
@@ -67,6 +76,10 @@ public:
 
 	void SetAnimation(UAnimSequence* Animation, bool Looping);
 	
+	UPROPERTY(VisibleAnywhere)
+	class UWeaponInventoryComponent* WeaponInventory;
+
+	TMap<int32, FKey> NumKeys;
 protected:
 
 	virtual void BeginPlay() override;
@@ -104,6 +117,14 @@ protected:
 
 	void StopAiming();
 
+	void InitiateAbilityOne(const FInputActionValue& Value);
+
+	
+	void SwitchWeapon(const FInputActionValue& Value);
+
+	UFUNCTION(Server, Reliable)
+	void WeaponChange();
+
 public:	
 
 	virtual void Tick(float DeltaTime) override;
@@ -125,7 +146,7 @@ public:
 	void OnRep_UpdateHealth();
 
 	UPROPERTY(BlueprintReadOnly)
-	float MaxHealth = 10000;
+	float MaxHealth = 1000;
 
 	UPROPERTY(ReplicatedUsing = OnRep_UpdateHealth, VisibleAnywhere, BlueprintReadWrite)
 	float Health;
@@ -133,20 +154,24 @@ public:
 	virtual float TakeDamage(float Damage, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
 
 	UFUNCTION(Server, Reliable)
-	virtual void ServerUpdateHealth(float Damage);
+	virtual void ServerUpdateHealth(float Damage, AFPSPlayerState* InstigatorPlayerState);
 
 	// Movement
 
 	UFUNCTION(Server, Reliable)
 	void EnableWallJump();
 
-	bool IsWallSliding;
-	bool WallJumpSlideEnabled;
 	bool CanWallJump;
-	FTimerHandle WallJumpCooldownHandle; 
+	bool IsWallJumpOnCooldown = false;
+	FTimerHandle WallJumpCooldownHandle;
+	int CurrentWallJumps = 0;
+	int MaxWallJumps = 1;
 
 	UPROPERTY(EditAnywhere)
     float WallJumpCooldownTime = 1.0f; 
+
+	UFUNCTION(Server, Reliable)
+	virtual void InitiatePrimaryAbility();
 
 private:
 

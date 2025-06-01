@@ -1,7 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "BaseProjectileGun.h"
-#include "FirstPersonCharacter.h"
+#include "../../../PlayerCharacter/Classes/FirstPersonCharacter.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/World.h"
 

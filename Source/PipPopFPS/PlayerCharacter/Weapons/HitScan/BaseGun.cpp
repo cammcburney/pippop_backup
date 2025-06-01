@@ -1,5 +1,5 @@
 #include "BaseGun.h"
-#include "FirstPersonCharacter.h"
+#include "../../../PlayerCharacter/Classes/FirstPersonCharacter.h"
 #include "GameFramework/PlayerState.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Kismet/GameplayStatics.h"
@@ -192,4 +192,9 @@ void ABaseGun::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetime
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     
     DOREPLIFETIME(ABaseGun, Damage);
+}
+
+void ABaseGun::DestroySelf()
+{
+    Destroy();
 }

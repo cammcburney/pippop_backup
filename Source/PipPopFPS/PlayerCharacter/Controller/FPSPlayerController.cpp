@@ -6,7 +6,7 @@
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
 #include "Engine/Engine.h"
-#include "PipPopGameMode.h"
+#include "../../GameMode/PipPopGameMode.h"
 
 void AFPSPlayerController::BeginPlay()
 {
@@ -20,8 +20,13 @@ void AFPSPlayerController::BeginPlay()
 void AFPSPlayerController::ServerSpawnPlayer_Implementation()
 {
     APipPopGameMode* GameMode = Cast<APipPopGameMode>(UGameplayStatics::GetGameMode(GetWorld()));
-    if (GameMode)
+    if (GameMode && HasAuthority())
     {
-        GameMode->SpawnPlayer(this);
+        GameMode->SpawnPlayer(this, FName("WorldSpawn"));
     }
+}
+
+void AFPSPlayerController::SetCharacter_Implementation(AFirstPersonCharacter* NewPlayerCharacter)
+{
+    PlayerClass = NewPlayerCharacter->GetClass();
 }

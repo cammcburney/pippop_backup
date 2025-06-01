@@ -8,28 +8,38 @@
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "GameFramework/DamageType.h"
-#include "BaseGun.h"
-#include "DrawDebugHelpers.h"  // Include for drawing debug lines
+#include "../Weapons/HitScan/BaseGun.h"
+#include "DrawDebugHelpers.h"
 
 AFirstPersonCharacter::AFirstPersonCharacter()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	bReplicates = true;
 	bUseControllerRotationYaw = true;
-	IsWallSliding = false;
 	CanWallJump = false;
-	WallJumpSlideEnabled = true;
 
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(GetMesh());
 	CameraBoom->TargetArmLength = 600.0f;
 	CameraBoom->bUsePawnControlRotation = true;
 	
-	CineCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("CineCamera"));
+	CineCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
     CineCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
     CineCamera->bUsePawnControlRotation = false; 
     CineCamera->FieldOfView = 110.0f;
 
+	WeaponInventory = CreateDefaultSubobject<UWeaponInventoryComponent>(TEXT("WeaponInventory"));
+	WeaponInventory->SetIsReplicated(true);
+
+	NumKeys.Add(1, EKeys::One);
+	NumKeys.Add(2, EKeys::Two);
+	NumKeys.Add(3, EKeys::Three);
+	NumKeys.Add(4, EKeys::Four);
+	NumKeys.Add(5, EKeys::Five);
+	NumKeys.Add(6, EKeys::Six);
+	NumKeys.Add(7, EKeys::Seven);
+	NumKeys.Add(8, EKeys::Eight);
+	NumKeys.Add(9, EKeys::Nine);
 }
 
 void AFirstPersonCharacter::BeginPlay()
@@ -61,9 +71,10 @@ void AFirstPersonCharacter::Tick(float DeltaTime)
 
 	if (MoveComponent->IsMovingOnGround())
 	{
-		IsWallSliding = false;
+		CanWallJump = false;
+		CurrentWallJumps = 0;
 	}
-	if (!IsWallSliding)
+	if (!CanWallJump)
 	{
 		WallSliding();
 	}
@@ -113,6 +124,12 @@ void AFirstPersonCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInp
 
 		//Picking up items
 		EnhancedInputComponent->BindAction(PickupItemAction, ETriggerEvent::Triggered, this, &AFirstPersonCharacter::PickupItem);
+
+		//Use Primary Special Ability
+		EnhancedInputComponent->BindAction(SpecialAbilityOne, ETriggerEvent::Triggered, this, &AFirstPersonCharacter::InitiateAbilityOne);
+		
+		//Switch Weapons
+		EnhancedInputComponent->BindAction(SwitchWeaponAction, ETriggerEvent::Triggered, this, &AFirstPersonCharacter::SwitchWeapon);
 	}
 }
 
@@ -151,7 +168,7 @@ void AFirstPersonCharacter::WallSliding_Implementation()
     if (MoveComponent->IsFalling())
     {
         FVector Start = GetActorLocation();
-        FVector End = Start + GetActorForwardVector() * 300;
+        FVector End = Start + GetActorForwardVector() * 100;
 
 		FCollisionQueryParams QueryParams;
 		QueryParams.AddIgnoredActor(this);
@@ -173,9 +190,7 @@ void AFirstPersonCharacter::WallSliding_Implementation()
                 FVector NewVelocity = FMath::VInterpConstantTo(MoveComponent->Velocity, FVector(0.0f, 0.0f, 0.0f), GetWorld()->GetDeltaSeconds(), 500);
                 MoveComponent->Velocity = NewVelocity;
 
-                IsWallSliding = true;
                 CanWallJump = true;
-                WallJumpSlideEnabled = true;
             }
         }
     }
@@ -184,7 +199,7 @@ void AFirstPersonCharacter::WallSliding_Implementation()
 
 void AFirstPersonCharacter::EnableWallJump_Implementation()
 {
-	WallJumpSlideEnabled = true;
+	IsWallJumpOnCooldown = false;
 }
 
 void AFirstPersonCharacter::WallJump(const FInputActionValue& Value)
@@ -192,23 +207,22 @@ void AFirstPersonCharacter::WallJump(const FInputActionValue& Value)
     UCharacterMovementComponent* MoveComponent = GetCharacterMovement();
     bool ShouldWallJump = Value.Get<bool>();
     
-    if (ShouldWallJump)
+    if (ShouldWallJump && !IsWallJumpOnCooldown)
 	{
 		WallJumpRequest();
 	}
 }
 
 void AFirstPersonCharacter::WallJumpRequest_Implementation()
-{
-	if (CanWallJump && IsWallSliding && WallJumpSlideEnabled)
+{	
+	UCharacterMovementComponent* MoveComponent = GetCharacterMovement();
+	if (CanWallJump && (CurrentWallJumps < MaxWallJumps))
     {
-        FVector JumpDirection = GetActorForwardVector() * 1500 + FVector(0.0f, 0.0f, 400.0f);
+        FVector JumpDirection = GetActorForwardVector() * 1400 + FVector(0.0f, 0.0f, MoveComponent->JumpZVelocity);
         LaunchCharacter(JumpDirection, true, true);
-
         CanWallJump = false;
-        WallJumpSlideEnabled = false;
-        IsWallSliding = false;
-        
+		CurrentWallJumps++;
+        IsWallJumpOnCooldown = true;
         GetWorld()->GetTimerManager().SetTimer(WallJumpCooldownHandle, this, &AFirstPersonCharacter::EnableWallJump, WallJumpCooldownTime, false);
     }
 }
@@ -265,14 +279,23 @@ void AFirstPersonCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 float AFirstPersonCharacter::TakeDamage(float Damage, struct FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser)
 {
     const float ActualDamage = Super::TakeDamage(Damage, DamageEvent, EventInstigator, DamageCauser);
-	ServerUpdateHealth(Damage);
+	APlayerController* IPC = Cast<APlayerController>(EventInstigator);
+	AFPSPlayerState* InstigatorPlayerState = IPC->GetPlayerState<AFPSPlayerState>();
+	ServerUpdateHealth(Damage, InstigatorPlayerState);
 	return Damage;
 }
 
-void AFirstPersonCharacter::ServerUpdateHealth_Implementation(float Damage)
+void AFirstPersonCharacter::ServerUpdateHealth_Implementation(float Damage, AFPSPlayerState* InstigatorPlayerState)
 {
 	Health = Health - Damage;
 	OnRep_UpdateHealth();
+	if (Health <= 0)
+	{
+		InstigatorPlayerState->UpdatePlayerScore();
+		Destroy();
+		Gun->DestroySelf();
+		// APacman_TestGameModeBase * GameMode= (APacman_TestGameModeBase *)GetWorld()->GetAuthGameMode();
+	}
 }
 
 void AFirstPersonCharacter::OnRep_UpdateHealth()
@@ -329,4 +352,54 @@ void AFirstPersonCharacter::ServerPickupItem_Implementation()
 			}
 		}
 	}
+}
+
+void AFirstPersonCharacter::InitiateAbilityOne(const FInputActionValue& Value)
+{
+	bool AbilityOneUsed = Value.Get<bool>();
+	if (AbilityOneUsed)
+	{
+		InitiatePrimaryAbility();
+	}
+}
+
+void AFirstPersonCharacter::InitiatePrimaryAbility_Implementation()
+{
+}
+
+void AFirstPersonCharacter::SwitchWeapon(const FInputActionValue& Value)
+{
+    bool SwitchWeapon = Value.Get<bool>();
+    if (SwitchWeapon)
+    {	
+		WeaponChange();
+    }
+}
+
+void AFirstPersonCharacter::WeaponChange_Implementation()
+{
+		APlayerController* PC = Cast<APlayerController>(GetController());
+        if (PC)
+        {
+            for (int32 i = 1; i <= 9; i++)
+            {	
+				GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Red, TEXT("Step 2: Choose Gun"));
+                FKey NumberKey = NumKeys[i];
+                if (PC->IsInputKeyDown(NumberKey))
+                {
+					GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Red, TEXT("Step 3: Switch Gun"));
+                    ABaseGun* NewGun = WeaponInventory->GetWeapon(NumberKey);
+                    {
+                        Gun = NewGun;
+                        if (Gun)
+                        {	
+							GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Blue, TEXT("Step 4: Set Gun"));
+                            Gun->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, TEXT("WeaponSocket"));
+                            Gun->SetOwner(this);
+                        }
+                    }
+                    break;
+                }
+            }
+        }
 }

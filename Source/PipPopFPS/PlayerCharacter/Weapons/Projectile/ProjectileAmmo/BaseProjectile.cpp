@@ -2,7 +2,7 @@
 #include "Components/SphereComponent.h"
 #include "Engine/StaticMesh.h"  
 #include "Components/StaticMeshComponent.h" 
-#include "FirstPersonCharacter.h"
+#include "../../../Classes/FirstPersonCharacter.h"
 #include "Engine/DamageEvents.h"
 #include "UObject/ConstructorHelpers.h"
 
