@@ -218,7 +218,7 @@ void AFirstPersonCharacter::WallJumpRequest_Implementation()
 	UCharacterMovementComponent* MoveComponent = GetCharacterMovement();
 	if (CanWallJump && (CurrentWallJumps < MaxWallJumps))
     {
-        FVector JumpDirection = GetActorForwardVector() * 1400 + FVector(0.0f, 0.0f, MoveComponent->JumpZVelocity);
+        FVector JumpDirection = GetActorForwardVector() * 1400 + FVector(0.0f, 0.0f, MoveComponent->JumpZVelocity * 1.5);
         LaunchCharacter(JumpDirection, true, true);
         CanWallJump = false;
 		CurrentWallJumps++;

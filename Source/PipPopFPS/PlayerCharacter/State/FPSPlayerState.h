@@ -9,7 +9,7 @@
 /**
  * 
  */
-UCLASS()
+UCLASS(BlueprintType)
 class PIPPOPFPS_API AFPSPlayerState : public APlayerState
 {
 	GENERATED_BODY()

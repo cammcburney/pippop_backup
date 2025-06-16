@@ -25,6 +25,7 @@ public:
 	UPROPERTY(BlueprintReadOnly)
 	FTimerHandle MatchTimer;
 	
+	UFUNCTION(BlueprintCallable)
 	void UpdateMapVotes(int32 MapVoted, int32 PreviousMapVoted);
 
 	uint8 SelectNextMap();
