@@ -13,6 +13,8 @@
 #include "../Components/WeaponInventoryComponent.h"
 #include "FirstPersonCharacter.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FUpdateGunDelegate);
+
 class ABaseGun;
 class USpringArmComponent;
 class UCameraComponent;
@@ -80,6 +82,10 @@ public:
 	class UWeaponInventoryComponent* WeaponInventory;
 
 	TMap<int32, FKey> NumKeys;
+
+	UPROPERTY(BlueprintAssignable)
+	FUpdateGunDelegate UpdateGunDelegate;
+
 protected:
 
 	virtual void BeginPlay() override;
@@ -172,6 +178,12 @@ public:
 
 	UFUNCTION(Server, Reliable)
 	virtual void InitiatePrimaryAbility();
+
+	UFUNCTION()
+	ABaseGun* GetGun();
+
+	UFUNCTION(BlueprintCallable)
+	TArray<int32> GetGunData();
 
 private:
 

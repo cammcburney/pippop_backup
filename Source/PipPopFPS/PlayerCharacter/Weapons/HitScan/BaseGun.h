@@ -9,6 +9,8 @@
 #include "NiagaraComponent.h"
 #include "BaseGun.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FUpdateAmmoDelegate);
+
 USTRUCT(BlueprintType)
 struct FBulletTrajectory
 {
@@ -72,6 +74,9 @@ public:
 	UFUNCTION(NetMulticast, Unreliable)
 	void SpawnMuzzleFlash();
 
+	UPROPERTY(BlueprintAssignable)
+	FUpdateAmmoDelegate UpdateAmmoDelegate;
+	
 protected:
 	
 	virtual void BeginPlay() override;
@@ -85,6 +90,15 @@ public:
 	USkeletalMeshComponent* Mesh;
 
 	void DestroySelf();
+	
+	UPROPERTY(EditAnywhere)
+	int32 MaxAmmo = 8;
+
+	UPROPERTY()
+	int32 Ammo = 0;
+
+	UPROPERTY(EditAnywhere)
+	int32 Magazines = 3;
 	
 private:
 	
@@ -113,15 +127,6 @@ private:
 	
 	UPROPERTY(EditAnywhere)
 	FSpreadAngleAxis SpreadAngles;
-
-	UPROPERTY(EditAnywhere)
-	int32 MaxAmmo = 8;
-
-	UPROPERTY()
-	int32 Ammo = 0;
-
-	UPROPERTY(EditAnywhere)
-	int32 Magazines = 3;
 
 	UPROPERTY(EditAnywhere)
 	int32 BulletsFiredPerShot = 1;

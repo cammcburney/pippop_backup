@@ -294,7 +294,6 @@ void AFirstPersonCharacter::ServerUpdateHealth_Implementation(float Damage, AFPS
 		InstigatorPlayerState->UpdatePlayerScore();
 		Destroy();
 		Gun->DestroySelf();
-		// APacman_TestGameModeBase * GameMode= (APacman_TestGameModeBase *)GetWorld()->GetAuthGameMode();
 	}
 }
 
@@ -304,7 +303,7 @@ void AFirstPersonCharacter::OnRep_UpdateHealth()
 void AFirstPersonCharacter::Reload(const FInputActionValue& Value)
 {
     bool Reloading = Value.Get<bool>();
-	if (Reloading)
+	if (Reloading && Gun->ReloadAvailable)
 	{
 		ServerReloadGun();
 	}
@@ -378,28 +377,46 @@ void AFirstPersonCharacter::SwitchWeapon(const FInputActionValue& Value)
 
 void AFirstPersonCharacter::WeaponChange_Implementation()
 {
-		APlayerController* PC = Cast<APlayerController>(GetController());
-        if (PC)
-        {
-            for (int32 i = 1; i <= 9; i++)
-            {	
-				GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Red, TEXT("Step 2: Choose Gun"));
-                FKey NumberKey = NumKeys[i];
-                if (PC->IsInputKeyDown(NumberKey))
+    APlayerController* PC = Cast<APlayerController>(GetController());
+    if (PC)
+    {
+        for (int32 i = 1; i <= 9; i++)
+        {	
+            GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Red, TEXT("Step 2: Choose Gun"));
+            FKey NumberKey = NumKeys[i];
+            if (PC->IsInputKeyDown(NumberKey))
+            {
+                GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Red, TEXT("Step 3: Switch Gun"));
+                ABaseGun* NewGun = WeaponInventory->GetWeapon(NumberKey);
+                if (NewGun) 
                 {
-					GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Red, TEXT("Step 3: Switch Gun"));
-                    ABaseGun* NewGun = WeaponInventory->GetWeapon(NumberKey);
-                    {
-                        Gun = NewGun;
-                        if (Gun)
-                        {	
-							GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Blue, TEXT("Step 4: Set Gun"));
-                            Gun->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, TEXT("WeaponSocket"));
-                            Gun->SetOwner(this);
-                        }
-                    }
-                    break;
+                    Gun = NewGun;
+                    GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Blue, TEXT("Step 4: Set Gun"));
+                    Gun->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, TEXT("WeaponSocket"));
+                    Gun->SetOwner(this);
+					UpdateGunDelegate.Broadcast();
+                    Gun->UpdateAmmoDelegate.Broadcast();
                 }
+                break;
             }
         }
+    }
+}
+
+TArray<int32> AFirstPersonCharacter::GetGunData()
+{
+	if (Gun)
+	{
+		return TArray<int32>{Gun->Ammo, Gun->MaxAmmo, Gun->Magazines};
+	}
+	return TArray<int32>();
+}
+
+ABaseGun* AFirstPersonCharacter::GetGun()
+{
+	if (Gun) 
+	{
+		return Gun;
+	}
+	return nullptr;
 }

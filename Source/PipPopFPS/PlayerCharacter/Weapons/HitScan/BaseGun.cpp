@@ -39,7 +39,7 @@ bool ABaseGun::CanFire()
 void ABaseGun::FireGun_Implementation()
 {   
 
-        if (!Ammo || !Magazines || !CanFire()) return;
+        if (!Ammo || !CanFire()) return;
         SpawnMuzzleFlash();
         AController* OwnerController = GetOwnerController();
         if (OwnerController == nullptr) return;
@@ -49,7 +49,7 @@ void ABaseGun::FireGun_Implementation()
         ServerBulletLineTrace(OwnerController, Location, Rotation);
         LastFireTime = GetWorld()->GetTimeSeconds();
         Ammo--;
-        UE_LOG(LogTemp, Warning, TEXT("Ammo: %s"), *FString::Printf(TEXT("%d"), Ammo));
+        UpdateAmmoDelegate.Broadcast();
 }
 
 void ABaseGun::ServerBulletLineTrace_Implementation(AController* OwnerController, FVector Location, FRotator Rotation)
@@ -79,7 +79,6 @@ void ABaseGun::ServerBulletLineTrace_Implementation(AController* OwnerController
                 0,
                 1.0f
             );
-
             SpawnBulletImpact(Hit, Bullet);
             DamageActors(OwnerController, Hit, Bullet);
         }
@@ -102,11 +101,6 @@ void ABaseGun::DamageActors_Implementation(AController* OwnerController, FHitRes
             }
             FPointDamageEvent DamageEvent(Damage, Hit, Bullet.ShotDirection, nullptr);
             AFirstPersonCharacter* Character = Cast<AFirstPersonCharacter>(DamagedActor);
-            UE_LOG(LogTemp, Warning, TEXT("Damage Calculation Debug"));
-            UE_LOG(LogTemp, Warning, TEXT("Hit Actor: %s"), *DamagedActor->GetName());
-            UE_LOG(LogTemp, Warning, TEXT("Base Damage: %.2f"), Damage);
-            UE_LOG(LogTemp, Warning, TEXT("Max Range: %.2f"), MaxRange);
-            UE_LOG(LogTemp, Warning, TEXT("Hit Distance: %.2f"), Hit.Distance);
             if (Character)
             {   
                 Character->TakeDamage(Damage, DamageEvent, OwnerController, this);
@@ -138,19 +132,16 @@ AController* ABaseGun::GetOwnerController()
 void ABaseGun::Reload_Implementation()
 {
     if (Magazines && ReloadAvailable)
-    {
-        Ammo = MaxAmmo;
+    {   
         Magazines--;
-        UE_LOG(LogTemp, Warning, TEXT("Magazines: %s"), *FString::Printf(TEXT("%d"), Magazines));
+        Ammo = MaxAmmo;
+        UpdateAmmoDelegate.Broadcast();
     }
 }
 
 void ABaseGun::ReloadStatus_Implementation(bool CanReload)
 {
     ReloadAvailable = CanReload;
-    FString DebugMessage = FString::Printf(TEXT("CanReload: %s"), ReloadAvailable ? TEXT("True") : TEXT("False"));
-    GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Blue, DebugMessage);
-
 }
 
 void ABaseGun::SpawnMuzzleFlash_Implementation()
